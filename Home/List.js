@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet,ScrollView ,Text, View,Image, TouchableOpacity,FlatList ,Dimensions } from 'react-native';
+import { StyleSheet,ScrollView ,Text, View,Image, TouchableOpacity,FlatList ,ActivityIndicator,Dimensions } from 'react-native';
 import { Rating, AirbnbRating } from 'react-native-elements';
 
 export default class List extends React.Component {
@@ -7,10 +7,14 @@ export default class List extends React.Component {
    constructor(props){
     super(props);
     this.state = {
-  
+
+      loading: true,
+
       dataSource : [],
     
+      fetching_from_server: false,
     };
+    this.num_pages = 1;
   
   }
   
@@ -18,21 +22,51 @@ export default class List extends React.Component {
   
   componentDidMount(){
    console.log("HI");
-    const url= 'https://dev.eatnnow.com/restaurant/';
+    const url=('https://dev.eatnnow.com/restaurant/?num_pages=' + this.num_pages);
     fetch(url)
           .then((response) => response.json())
           .then((responseJson) => {
+
+            this.num_pages = this.num_pages + 1;
+
               this.setState({
-                  dataSource: responseJson.results,
-              },
+                  dataSource: [...this.state.dataSource , ...responseJson.results],
+              
+                  loading:false,
+                },
                console.log('data :', responseJson.results) )
   
+               
           })
           .catch((error) => {
               console.log(error);
           })
   
   }
+
+
+  loadMoreData = () => {
+    //On click of Load More button We will call the web API again
+      this.setState({ fetching_from_server: true }, () => {
+        fetch('https://dev.eatnnow.com/restaurant/?num_pages=' + this.num_pages)
+        //Sending the currect offset with get request
+            .then(response => response.json())
+            .then(responseJson => {
+            //Successful response from the API Call 
+            this.num_pages = this.num_pages + 1;
+              //After the response increasing the offset for the next API call.
+              this.setState({
+                dataSource: [...this.state.dataSource, ...responseJson.results],
+                //adding the new data with old one available
+                fetching_from_server: false,
+                //updating the loading state to false
+              });
+            })
+            .catch(error => {
+              console.error(error);
+            });
+      });
+    };
 
  
   renderItem = ({ item, index }) => {
@@ -84,6 +118,31 @@ export default class List extends React.Component {
               </TouchableOpacity>
     );
   };
+
+
+
+    
+  renderFooter() {
+  
+    return (
+    //Footer View with Load More button
+      <View style={styles.footer}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={this.loadMoreData}
+          //On Click of button calling loadMoreData function to load more data
+          style={styles.loadMoreBtn}>
+          <Text style={styles.btnText}>Load More</Text>
+          {this.state.fetching_from_server ? (
+            <ActivityIndicator color="white" style={{ marginLeft: 8 }} />
+          ) : null}
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+
+
   
   render() {
     return (
@@ -93,6 +152,9 @@ export default class List extends React.Component {
         data={this.state.dataSource}
         keyExtractor={item => item.id}
         renderItem={this.renderItem}
+
+        onEndReached={this.loadMoreData}
+        ListFooterComponent={this.renderFooter.bind(this)}
          />
      
       </View>
@@ -139,5 +201,14 @@ const styles = StyleSheet.create({
     alignItems:'flex-start',
     marginTop:-6,
     margin:10
-  }
+  },
+  loadMoreBtn: {
+    padding: 10,
+    backgroundColor: 'grey',
+    borderRadius: 4,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin:10
+  },
 });
